@@ -14,6 +14,9 @@
 > upstream project.
 >
 > **APK:** [Releases → `notrackers`](https://github.com/callmebroda/rikkahub-clean/releases/tag/notrackers)
+>
+> **Builds are manual.** Nothing here builds on a schedule or on a push. Upstream code is synced
+> automatically, but an APK is only produced when the build workflow is started by hand.
 
 ## What this repository is
 
@@ -23,6 +26,8 @@
   to the code; it is applied from [`patches/`](patches/) at build time, so upstream updates can
   never silently undo it.
 - No feature work happens here. If you want new features, they come from upstream.
+- **Building is manual.** The only automatic job is the upstream sync, which merges code and
+  checks the patches — it never runs a Gradle build.
 - `README_ZH_CN.md` and `README_ZH_TW.md` are untouched upstream files and still describe the
   official app. This English README is the accurate description of this build.
 
@@ -65,18 +70,23 @@ Three mechanisms, in order of importance:
    them, because the tracked source never contains those edits.
 2. **Upstream is synced automatically.** [`sync-upstream.yml`](.github/workflows/sync-upstream.yml)
    runs daily at 03:00 UTC (08:30 IST) and on manual dispatch: it merges
-   `rikkahub/rikkahub@master` into this repo's `master`, pushes, and then triggers the build.
+   `rikkahub/rikkahub@master` into this repo's `master`, pushes, and then **dry-runs the patches
+   to see whether they still apply**. It never builds an APK.
    `README.md` is resolved in favour of this fork (it is this fork's own document); any other
    conflict stops the sync with an error rather than guessing.
-3. **A broken patch fails the build, it does not slip through.** The build applies each patch,
-   falling back to a 3-way merge, and then greps the whole tree for
-   `com.google.firebase` / `com.google.gms` / `google-services`. If anything survives, the run
-   fails and no APK is published.
+3. **A broken patch is caught before it reaches a build.** The sync dry-runs every patch and
+   goes red, naming the file, if one no longer fits the synced code — so you find out from the
+   daily run, not from a failed build you paid attention-minutes for. The build repeats the same
+   check, then greps the whole tree for `com.google.firebase` / `com.google.gms` /
+   `google-services`; if anything survives, the run fails and no APK is published.
+
+The intended rhythm is: the sync merges upstream and reports whether the patches still fit → if a
+patch went stale you update it → then you start the build yourself, once.
 
 ### If a patch stops applying
 
-Upstream edited the same lines the patch touches. The build fails with an error naming the
-patch. To fix it:
+Upstream edited the same lines the patch touches. You will see it as a red **Sync upstream
+RikkaHub** run naming the patch (and, if you build anyway, as a failed build). To fix it:
 
 ```sh
 git clone https://github.com/callmebroda/rikkahub-clean.git
@@ -95,7 +105,9 @@ other intact. Then re-run the build workflow.
 
 ## How a build is produced
 
-[`build-notrackers.yml`](.github/workflows/build-notrackers.yml), manual dispatch only:
+[`build-notrackers.yml`](.github/workflows/build-notrackers.yml) — **manual dispatch only, never
+scheduled, never triggered by a push or by the sync.** An APK exists only because someone tapped
+*Run workflow*:
 
 1. Checkout, JDK 21, Node 22, pnpm 11, `pnpm install` in `web-ui/` (the `:web` module builds a
    React SPA during `preBuild`).
@@ -104,8 +116,10 @@ other intact. Then re-run the build workflow.
 4. `./gradlew assembleGithubRelease` — arm64-v8a, x86_64 and a universal APK.
 5. Upload the APKs as a workflow artifact and publish them to the `notrackers` release.
 
-No repository secrets are needed. Public-repo Actions minutes are free; a build uses roughly
-20-30.
+No repository secrets are needed. One build uses roughly 20-30 runner-minutes. (For the record,
+GitHub does not meter Actions minutes on public repositories — the monthly allowance applies to
+private ones — but keeping builds manual is still the right default here: an APK only appears
+when it is actually wanted.)
 
 ### Installing and updating
 
