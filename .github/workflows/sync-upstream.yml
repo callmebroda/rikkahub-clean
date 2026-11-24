@@ -1,9 +1,14 @@
 name: Sync upstream RikkaHub
 
-# Keeps this fork on top of rikkahub/rikkahub. The tracker-removal changes live
-# in patches/ and are applied at build time, so an upstream merge never touches
-# them. If an upstream change makes a patch stop applying, the build fails with
-# an error naming the patch instead of shipping a tracked APK.
+# Keeps this fork on top of rikkahub/rikkahub.
+#
+# This workflow NEVER builds the APK — building is manual, on purpose, so no
+# Actions time is spent unless you ask for it. All it does is:
+#   1. merge rikkahub/rikkahub@master into this repo's master and push
+#   2. dry-run the patches in patches/ to check they still apply
+#
+# If step 2 fails, the run goes red and names the patch: update that patch
+# against the new upstream code, then run the build workflow yourself.
 on:
   schedule:
     - cron: '0 3 * * *'   # daily, 03:00 UTC = 08:30 IST
@@ -14,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
     steps:
       - name: Check out fork
         uses: actions/checkout@v4
@@ -66,9 +70,32 @@ jobs:
             echo "Pushed upstream merge to master."
           fi
 
-      - name: Trigger tracker-free build
-        if: steps.merge.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-        run: gh workflow run build-notrackers.yml --ref master
+      # Dry run only: nothing is committed, nothing is built. This is the check
+      # that tells you whether the patches still fit the synced upstream code.
+      - name: Check the patches still apply
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+          files=(patches/*.patch)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No patches found in patches/"; exit 1
+          fi
+
+          failed=""
+          for p in "${files[@]}"; do
+            if git apply --check "$p" >/dev/null 2>&1; then
+              echo "OK        $p"
+            elif git apply --3way --check "$p" >/dev/null 2>&1; then
+              echo "OK (3-way) $p"
+            else
+              echo "STALE     $p"
+              failed="$failed $p"
+            fi
+          done
+          git reset --hard -q
+
+          if [ -n "$failed" ]; then
+            echo "::error::Patch(es) no longer apply:$failed — update them before building. See README, 'If a patch stops applying'."
+            exit 1
+          fi
+          echo "All patches still apply. Nothing was built — run the build workflow when you want an APK."
