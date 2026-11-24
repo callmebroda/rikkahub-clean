@@ -1,0 +1,53 @@
+From 4eec7507613b45949c4c9fe05468ad6634bd745e Mon Sep 17 00:00:00 2001
+From: patch <p@x>
+Date: Tue, 24 Nov 2026 11:16:58 +0000
+Subject: [PATCH] Disable the version ping to updates.rikka-ai.com (optional)
+
+---
+ .../me/rerere/rikkahub/utils/UpdateChecker.kt | 28 ++-----------------
+ 1 file changed, 2 insertions(+), 26 deletions(-)
+
+diff --git a/app/src/main/java/me/rerere/rikkahub/utils/UpdateChecker.kt b/app/src/main/java/me/rerere/rikkahub/utils/UpdateChecker.kt
+index 291268e..615cc09 100644
+--- a/app/src/main/java/me/rerere/rikkahub/utils/UpdateChecker.kt
++++ b/app/src/main/java/me/rerere/rikkahub/utils/UpdateChecker.kt
+@@ -35,34 +35,10 @@ class UpdateChecker(
+         initialValue = UiState.Loading,
+     )
+ 
++    // De-tracked build: no version ping to updates.rikka-ai.com.
+     private fun checkUpdate(): Flow<UiState<UpdateInfo>> = flow {
+         emit(UiState.Loading)
+-        emit(
+-            UiState.Success(
+-                data = try {
+-                    val response = client.newCall(
+-                        Request.Builder()
+-                            .url(API_URL)
+-                            .get()
+-                            .addHeader(
+-                                "User-Agent",
+-                                "RikkaHub ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
+-                            )
+-                            .build()
+-                    ).await()
+-                    if (response.isSuccessful) {
+-                        json.decodeFromString<UpdateInfo>(response.body.string())
+-                    } else {
+-                        throw Exception("Failed to fetch update info")
+-                    }
+-                } catch (e: Exception) {
+-                    throw Exception("Failed to fetch update info", e)
+-                }
+-            )
+-        )
+-    }.catch {
+-        emit(UiState.Error(it))
+-    }.flowOn(Dispatchers.IO)
++    }
+ 
+     fun downloadUpdate(context: Context, download: UpdateDownload) {
+         runCatching {
+-- 
+2.39.5
+

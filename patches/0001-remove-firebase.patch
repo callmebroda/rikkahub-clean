@@ -1,0 +1,189 @@
+From dad8a3f9454aadd7d5e1a5a79d5ba650a2ed5a76 Mon Sep 17 00:00:00 2001
+From: patch <p@x>
+Date: Tue, 24 Nov 2026 11:16:41 +0000
+Subject: [PATCH] Remove Firebase Analytics and Crashlytics; build without
+ google-services.json
+
+---
+ app/build.gradle.kts                                  |  7 -------
+ app/src/main/java/me/rerere/rikkahub/di/AppModule.kt  | 11 -----------
+ .../java/me/rerere/rikkahub/di/ViewModelModule.kt     |  1 -
+ .../java/me/rerere/rikkahub/ui/pages/chat/ChatVM.kt   |  9 ---------
+ build.gradle.kts                                      |  2 --
+ gradle/libs.versions.toml                             |  8 --------
+ 6 files changed, 38 deletions(-)
+
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index ce3f348..e9734d3 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -9,8 +9,6 @@ plugins {
+     alias(libs.plugins.kotlin.compose)
+     alias(libs.plugins.kotlin.serialization)
+     alias(libs.plugins.ksp)
+-    alias(libs.plugins.google.services)
+-    alias(libs.plugins.firebase.crashlytics)
+     alias(libs.plugins.baselineprofile)
+ }
+ 
+@@ -220,11 +218,6 @@ dependencies {
+     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+     implementation(libs.androidx.material3.adaptive.navigation3)
+ 
+-    // Firebase
+-    implementation(platform(libs.firebase.bom))
+-    implementation(libs.firebase.analytics)
+-    implementation(libs.firebase.crashlytics)
+-
+     // DataStore
+     implementation(libs.androidx.datastore.preferences)
+ 
+diff --git a/app/src/main/java/me/rerere/rikkahub/di/AppModule.kt b/app/src/main/java/me/rerere/rikkahub/di/AppModule.kt
+index 34394f8..68d6d5f 100644
+--- a/app/src/main/java/me/rerere/rikkahub/di/AppModule.kt
++++ b/app/src/main/java/me/rerere/rikkahub/di/AppModule.kt
+@@ -1,8 +1,5 @@
+ package me.rerere.rikkahub.di
+ 
+-import com.google.firebase.Firebase
+-import com.google.firebase.analytics.analytics
+-import com.google.firebase.crashlytics.crashlytics
+ import kotlinx.serialization.json.Json
+ import me.rerere.rikkahub.AppScope
+ import me.rerere.rikkahub.data.ai.ChatRequestFactory
+@@ -60,14 +57,6 @@ val appModule = module {
+         TTSManager(get())
+     }
+ 
+-    single {
+-        Firebase.crashlytics
+-    }
+-
+-    single {
+-        Firebase.analytics
+-    }
+-
+     single {
+         SoundEffectPlayer(get())
+     }
+diff --git a/app/src/main/java/me/rerere/rikkahub/di/ViewModelModule.kt b/app/src/main/java/me/rerere/rikkahub/di/ViewModelModule.kt
+index 62762b6..6b950ef 100644
+--- a/app/src/main/java/me/rerere/rikkahub/di/ViewModelModule.kt
++++ b/app/src/main/java/me/rerere/rikkahub/di/ViewModelModule.kt
+@@ -37,7 +37,6 @@ val viewModelModule = module {
+             settingsStore = get(),
+             chatService = get(),
+             updateChecker = get(),
+-            analytics = get(),
+             filesManager = get(),
+             favoriteRepository = get(),
+             backgroundShellManager = get(),
+diff --git a/app/src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatVM.kt b/app/src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatVM.kt
+index 5cc6507..392720a 100644
+--- a/app/src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatVM.kt
++++ b/app/src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatVM.kt
+@@ -12,7 +12,6 @@ import androidx.compose.ui.tooling.preview.Preview
+ import androidx.core.net.toUri
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+-import com.google.firebase.analytics.FirebaseAnalytics
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.flow.SharedFlow
+ import kotlinx.coroutines.flow.SharingStarted
+@@ -62,7 +61,6 @@ class ChatVM(
+     private val settingsStore: SettingsStore,
+     private val chatService: ChatService,
+     val updateChecker: UpdateChecker,
+-    private val analytics: FirebaseAnalytics,
+     private val filesManager: FilesManager,
+     private val favoriteRepository: FavoriteRepository,
+     private val backgroundShellManager: BackgroundShellManager,
+@@ -245,15 +243,11 @@ class ChatVM(
+      */
+     fun handleMessageSend(content: List<UIMessagePart>,answer: Boolean = true) {
+         if (content.isEmptyInputMessage()) return
+-        analytics.logEvent("ai_send_message", null)
+-
+         chatService.sendMessage(_conversationId, content, answer)
+     }
+ 
+     fun handleMessageEdit(parts: List<UIMessagePart>, messageId: Uuid) {
+         if (parts.isEmptyInputMessage()) return
+-        analytics.logEvent("ai_edit_message", null)
+-
+         viewModelScope.launch {
+             chatService.editMessage(_conversationId, messageId, parts)
+         }
+@@ -286,7 +280,6 @@ class ChatVM(
+     }
+ 
+     fun regenerateAtMessage(message: UIMessage) {
+-        analytics.logEvent("ai_regenerate_at_message", null)
+         chatService.regenerateAtMessage(_conversationId, message.id)
+     }
+ 
+@@ -295,7 +288,6 @@ class ChatVM(
+         approved: Boolean,
+         reason: String = ""
+     ) {
+-        analytics.logEvent("ai_tool_approval", null)
+         chatService.handleToolApproval(_conversationId, toolCallId, approved, reason)
+     }
+ 
+@@ -303,7 +295,6 @@ class ChatVM(
+         toolCallId: String,
+         answer: String,
+     ) {
+-        analytics.logEvent("ai_tool_answer", null)
+         chatService.handleToolApproval(_conversationId, toolCallId, approved = true, answer = answer)
+     }
+ 
+diff --git a/build.gradle.kts b/build.gradle.kts
+index fb5ec8a..ebab776 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -4,8 +4,6 @@ plugins {
+     alias(libs.plugins.kotlin.compose) apply false
+     alias(libs.plugins.android.library) apply false
+     alias(libs.plugins.ksp) apply false
+-    alias(libs.plugins.google.services) apply false
+-    alias(libs.plugins.firebase.crashlytics) apply false
+     alias(libs.plugins.android.test) apply false
+     alias(libs.plugins.baselineprofile) apply false
+     alias(libs.plugins.spotless)
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index d8121b1..b347402 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -33,9 +33,6 @@ ksp = "2.3.10"
+ paging = "3.5.3"
+ huge-icons = "1.5"
+ image-viewer = "1.1.0-alpha.7"
+-google-services = "4.5.0"
+-firebase-bom = "35.1.0"
+-firebase-crashlytics = "3.0.8"
+ jsoup = "1.23.2"
+ zxing = "3.5.4"
+ leakcanary = "2.14"
+@@ -136,9 +133,6 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
+ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+ huge-icons = { group = "com.github.rikkahub", name = "hugeicons-compose", version.ref = "huge-icons" }
+ image-viewer = { group = "com.jvziyaoyao.scale", name = "image-viewer", version.ref = "image-viewer" }
+-firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
+-firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+-firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+ jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+ zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+ leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary" }
+@@ -194,8 +188,6 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
+ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ android-library = { id = "com.android.library", version.ref = "agp" }
+ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+-google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
+-firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebase-crashlytics" }
+ android-test = { id = "com.android.test", version.ref = "agp" }
+ baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile" }
+ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+-- 
+2.39.5
+

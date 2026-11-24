@@ -1,0 +1,74 @@
+name: Sync upstream RikkaHub
+
+# Keeps this fork on top of rikkahub/rikkahub. The tracker-removal changes live
+# in patches/ and are applied at build time, so an upstream merge never touches
+# them. If an upstream change makes a patch stop applying, the build fails with
+# an error naming the patch instead of shipping a tracked APK.
+on:
+  schedule:
+    - cron: '0 3 * * *'   # daily, 03:00 UTC = 08:30 IST
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream master
+        id: merge
+        run: |
+          set -euo pipefail
+          git config user.name "upstream-sync"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          before=$(git rev-parse HEAD)
+
+          git remote add upstream https://github.com/rikkahub/rikkahub.git
+          git fetch --no-tags upstream master
+
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "Already up to date with upstream."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Merging upstream $(git rev-parse --short upstream/master)"
+          if git merge --no-edit upstream/master; then
+            echo "Merged cleanly."
+          else
+            # README.md is this fork's own document and always differs.
+            # Any other conflict has to be resolved by hand.
+            conflicting=$(git diff --name-only --diff-filter=U)
+            echo "Conflicts in: $conflicting"
+            others=$(printf '%s\n' "$conflicting" | grep -vx 'README.md' || true)
+            if [ -n "$others" ]; then
+              echo "::error::Conflict outside README.md ($others). Resolve by hand, then re-run this workflow."
+              exit 1
+            fi
+            git checkout --ours README.md
+            git add README.md
+            git commit --no-edit
+            echo "Resolved README.md in favour of this fork."
+          fi
+
+          after=$(git rev-parse HEAD)
+          if [ "$before" = "$after" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git push origin HEAD:master
+            echo "Pushed upstream merge to master."
+          fi
+
+      - name: Trigger tracker-free build
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run build-notrackers.yml --ref master
