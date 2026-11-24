@@ -1,3 +1,72 @@
+> [!IMPORTANT]
+> **This is a modified build of RikkaHub — not the official app.**
+>
+> This repository is a personal fork of [rikkahub/rikkahub](https://github.com/rikkahub/rikkahub)
+> with **Google Firebase (Analytics and Crashlytics) removed** and the first-party update ping
+> disabled. Download the APK only from
+> [this repository's Releases](https://github.com/callmebroda/rikkahub-clean/releases/tag/notrackers).
+>
+> Issues with this build belong here, not in the upstream project.
+
+## 🔧 Differences from upstream RikkaHub
+
+Based on upstream commit `2435dbd` ("chore: bump version to 3.3.1", 2026-11-21) — RikkaHub
+3.3.1, versionCode 198.
+
+| | Upstream `rikkahub/rikkahub` | This fork (`rikkahub-clean`) |
+|---|---|---|
+| Analytics | `firebase-analytics` sends 5 event names: `ai_send_message`, `ai_edit_message`, `ai_regenerate_at_message`, `ai_tool_approval`, `ai_tool_answer` | **Removed.** No analytics SDK, no events |
+| Crash reporting | `firebase-crashlytics`, enabled by default with no in-app opt-out | **Removed** |
+| Build requirement | `app/google-services.json` must exist (upstream CI writes it from a secret) | **Not needed** — a plain clone builds |
+| Version check | `GET https://updates.rikka-ai.com/` on first launch, sending `RikkaHub <version> #<versionCode>` in the User-Agent | **Disabled** — the app never contacts that host |
+| Signing | Upstream release key | Fresh RSA-4096 key generated inside CI on every run |
+| Build pipeline | Local Android Studio, or upstream CI with keystore + Google Services secrets | `.github/workflows/build-notrackers.yml` in this repo, no secrets required |
+
+### Exactly what changed in the source
+
+38 lines deleted across 6 files, plus one function body:
+
+| File | Change |
+|---|---|
+| `gradle/libs.versions.toml` | Removed the `google-services`, `firebase-bom` and `firebase-crashlytics` versions, the three Firebase library aliases and the two Gradle plugin aliases |
+| `build.gradle.kts` | Removed the `google-services` and `firebase-crashlytics` plugin declarations |
+| `app/build.gradle.kts` | Removed both plugin aliases and the Firebase dependency block |
+| `app/src/main/java/me/rerere/rikkahub/di/AppModule.kt` | Removed the `Firebase.crashlytics` and `Firebase.analytics` Koin singletons |
+| `app/src/main/java/me/rerere/rikkahub/di/ViewModelModule.kt` | Removed the `analytics = get()` injection into `ChatVM` |
+| `app/src/main/java/me/rerere/rikkahub/ui/pages/chat/ChatVM.kt` | Removed the `FirebaseAnalytics` constructor parameter and the 5 `logEvent` calls |
+| `app/src/main/java/me/rerere/rikkahub/utils/UpdateChecker.kt` | `checkUpdate()` now returns immediately instead of calling `updates.rikka-ai.com` |
+
+### What was deliberately left alone
+
+- Everything else is upstream code, unmodified: features, UI, providers, tools, permissions.
+- The package id is still `me.rerere.rikkahub`, so this build **conflicts with an installed
+  official RikkaHub** — uninstall one before installing the other.
+- The app still talks to the AI providers you configure, and to `sponsors.rikka-ai.com` for the
+  sponsor list on the About page. Those are the only first-party endpoints left.
+- No other tracker SDK was ever present upstream: no AdMob, AppsFlyer, Adjust, Umeng, Bugly,
+  Sentry, PostHog, Amplitude or Mixpanel.
+
+### Installing and updating
+
+Every CI run generates a new signing key, so a newer build cannot be installed over an older one.
+Uninstall the previous copy first. If you want in-place updates, add your own keystore as a
+base64 repository secret and change the "Generate signing key" step to decode it instead of
+creating a new key.
+
+### Licence and modification notice (AGPL-3.0)
+
+Upstream RikkaHub is licensed under the GNU Affero General Public License v3.0. This is a
+modified version of that work, produced and published under the same licence, with the complete
+corresponding source in this repository. The modifications are the Firebase removal and the
+update-check change listed above, made on 2026-11-24. No upstream code was relicensed and no
+authorship of unchanged code is claimed.
+
+---
+
+*Everything below is the upstream README, kept for reference.*
+
+---
+
 <div align="center">
   <img src="docs/icon.png" alt="App Icon" width="100" />
   <h1>RikkaHub</h1>
@@ -16,9 +85,11 @@ Click to join our Discord server 👉 [【RikkaHub】](https://discord.gg/9weBqx
 
 ## 🚀 Download
 
-🔗 [Download from Website](https://rikka-ai.com/download) (Recommended)
+🔗 [Download the tracker-free APK from this repository's Releases](https://github.com/callmebroda/rikkahub-clean/releases/tag/notrackers)
 
-🔗 [Download from Google Play](https://play.google.com/store/apps/details?id=me.rerere.rikkahub)
+> The official app is published at [rikka-ai.com/download](https://rikka-ai.com/download) and
+> [Google Play](https://play.google.com/store/apps/details?id=me.rerere.rikkahub). Those builds
+> still include Firebase Analytics and Crashlytics.
 
 > [!WARNING]
 > There are many forked versions of RikkaHub. Issues with forks are unrelated to RikkaHub, so please use forks with caution to avoid privacy leaks or excessive permission requests.
