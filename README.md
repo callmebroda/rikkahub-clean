@@ -33,8 +33,10 @@
 
 ## Differences from upstream RikkaHub
 
-Based on upstream commit `2435dbd` ("chore: bump version to 3.3.1", 2026-11-21) — RikkaHub
-3.3.1, versionCode 198.
+Tracks upstream `master` automatically: the daily sync merges it, so the app behaviour here is
+whatever upstream currently ships (RikkaHub 3.3.1, versionCode 198 at the time of writing). The
+exact upstream base of any build is visible in
+[the commit history](https://github.com/callmebroda/rikkahub-clean/commits/master).
 
 | | Upstream `rikkahub/rikkahub` | This build |
 |---|---|---|
