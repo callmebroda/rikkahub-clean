@@ -107,9 +107,11 @@ other intact. Then re-run the build workflow.
 
 ## How a build is produced
 
-[`build-notrackers.yml`](.github/workflows/build-notrackers.yml) — **manual dispatch only, never
-scheduled, never triggered by a push or by the sync.** An APK exists only because someone tapped
-*Run workflow*:
+[`build-notrackers.yml`](.github/workflows/build-notrackers.yml) — **manual only, never scheduled,
+never triggered by the upstream sync or by a normal commit.** A build starts when someone taps
+*Run workflow*, or when a tag named `build-*` is pushed (`git tag build-2026-11-25 && git push
+origin build-2026-11-25`), which is just another deliberate way to ask for one. An APK exists
+only because a build was asked for:
 
 1. Checkout, JDK 21, Node 22, pnpm 11, `pnpm install` in `web-ui/` (the `:web` module builds a
    React SPA during `preBuild`).

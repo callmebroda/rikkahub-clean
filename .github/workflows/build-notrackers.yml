@@ -8,7 +8,14 @@ name: Build tracker-free RikkaHub APK
 # never silently drop it, and an upstream change that breaks a patch fails the
 # build loudly instead of producing a tracked APK.
 on:
+  # Manual only. Nothing builds on a schedule, on a commit or on the upstream
+  # sync. A build starts either from the Actions tab or by pushing a tag whose
+  # name starts with "build-", which is a deliberate act too:
+  #   git tag build-2026-11-25 && git push origin build-2026-11-25
   workflow_dispatch:
+  push:
+    tags:
+      - 'build-*'
 
 jobs:
   build:
